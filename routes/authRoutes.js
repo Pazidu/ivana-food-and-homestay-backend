@@ -80,7 +80,7 @@ const verifyToken = async (req, res, next) => {
   }
 };
 
-router.get("/home", verifyToken, async (req, res) => {
+router.get("/user/foods/home", verifyToken, async (req, res) => {
   try {
     const db = await connectToDatabase();
 
