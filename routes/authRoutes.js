@@ -8,7 +8,6 @@ const router = express.Router();
 router.post("/signup", async (req, res) => {
   const { username, email, address, city, phone, password, confirmPassword } =
     req.body;
-  console.log("Received signup data:", req.body);
   try {
     const db = await connectToDatabase();
 
