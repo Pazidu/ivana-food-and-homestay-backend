@@ -59,7 +59,7 @@ router.post("/login", async (req, res) => {
       expiresIn: "1h",
     });
 
-    return res.status(201).json({ token: token });
+    return res.status(201).json({ token: token, id: rows[0].id });
   } catch (error) {
     res.status(500).json({ error: "Internal server error" });
   }
@@ -67,7 +67,7 @@ router.post("/login", async (req, res) => {
 
 const verifyToken = async (req, res, next) => {
   try {
-    const token = req.headers("authorization").split(" ")[1];
+    const token = req.headers.authorization?.split(" ")[1];
     if (!token) {
       return res.status(403).json({ error: "No token provided" });
     }
