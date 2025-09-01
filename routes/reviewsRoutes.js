@@ -56,4 +56,34 @@ router.post("/foods/reviews", async (req, res) => {
   }
 });
 
+router.post("/foods/complaints", async (req, res) => {
+  try {
+    console.log("Body received:", req.body); // debug
+    const { name, comment } = req.body;
+
+    if (!name || !comment) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+
+    const [result] = await db.query(
+      "INSERT INTO complaints (name, comment) VALUES (?, ?)",
+      [name, comment]
+    );
+
+    res.status(201).json({
+      message: "Complaint added successfully",
+      complaint: {
+        id: result.insertId,
+        user: name,
+        comment,
+      },
+    });
+  } catch (error) {
+    console.error("Error adding complaint:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to add complaint", error: error.message });
+  }
+});
+
 export default router;
