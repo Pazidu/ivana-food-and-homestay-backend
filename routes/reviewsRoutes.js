@@ -56,6 +56,19 @@ router.post("/foods/reviews", async (req, res) => {
   }
 });
 
+// Delete review
+router.delete("/foods/reviews/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    // const db = await connectToDatabase();
+    await db.query("DELETE FROM reviews WHERE id = ?", [id]);
+    res.json({ message: "Review deleted successfully" });
+  } catch (err) {
+    res.status(500).json(err);
+  }
+});
+
+//POST a new complaint
 router.post("/foods/complaints", async (req, res) => {
   try {
     console.log("Body received:", req.body); // debug
