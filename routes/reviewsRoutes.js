@@ -68,6 +68,17 @@ router.delete("/foods/reviews/:id", async (req, res) => {
   }
 });
 
+// GET all complaints
+router.get("/foods/complaints", async (req, res) => {
+  try {
+    const [rows] = await db.query("SELECT * FROM complaints");
+    res.json(rows);
+  } catch (error) {
+    console.error("Error fetching complaints:", error);
+    res.status(500).json({ message: "Failed to fetch complaints" });
+  }
+});
+
 //POST a new complaint
 router.post("/foods/complaints", async (req, res) => {
   try {
@@ -96,6 +107,18 @@ router.post("/foods/complaints", async (req, res) => {
     res
       .status(500)
       .json({ message: "Failed to add complaint", error: error.message });
+  }
+});
+
+// Delete complaint
+router.delete("/foods/complaints/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    // const db = await connectToDatabase();
+    await db.query("DELETE FROM complaints WHERE id = ?", [id]);
+    res.json({ message: "Complaint deleted successfully" });
+  } catch (err) {
+    res.status(500).json(err);
   }
 });
 
