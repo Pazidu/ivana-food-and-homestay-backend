@@ -2,6 +2,7 @@ import express from "express";
 import { connectToDatabase } from "../lib/db.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import e from "express";
 
 const router = express.Router();
 
@@ -59,7 +60,16 @@ router.post("/login", async (req, res) => {
       expiresIn: "1h",
     });
 
-    return res.status(201).json({ token: token, id: rows[0].id });
+    return res.status(201).json({
+      token: token,
+      id: rows[0].id,
+      username: rows[0].username,
+      email: rows[0].email,
+      address: rows[0].address,
+      city: rows[0].city,
+      phone: rows[0].phone,
+      user_type: rows[0].user_type,
+    });
   } catch (error) {
     res.status(500).json({ error: "Internal server error" });
   }
@@ -79,7 +89,7 @@ const verifyToken = async (req, res, next) => {
   }
 };
 
-router.get("/user/foods/home", verifyToken, async (req, res) => {
+router.get("/user/profile", verifyToken, async (req, res) => {
   try {
     const db = await connectToDatabase();
 
