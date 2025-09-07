@@ -1,27 +1,22 @@
 // index.js
 import express from "express";
 import cors from "cors";
+import jwt from "jsonwebtoken";
 import authRouter from "./routes/authRoutes.js";
 import reviewRouter from "./routes/reviewsRoutes.js";
 import adminRouter from "./routes/adminRoutes.js";
+import cartRoutes from "./routes/cartRoutes.js";
 import { connectToDatabase } from "./lib/db.js";
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ✅ Attach routers
-app.use("/auth", authRouter);
-app.use("/api", reviewRouter);
-app.use("/api", adminRouter);
-
-// ✅ Example menu route
+// ✅ Menu route
 app.get("/api/foods/menu", async (req, res) => {
   const { type } = req.query;
-
-  if (!type) {
+  if (!type)
     return res.status(400).json({ error: "Missing 'type' query parameter" });
-  }
 
   try {
     const db = await connectToDatabase();
@@ -30,16 +25,23 @@ app.get("/api/foods/menu", async (req, res) => {
     ]);
     res.json(results);
   } catch (err) {
-    console.error("Menu DB error:", err.message, err.stack);
+    console.error("Menu DB error:", err.message);
     res.status(500).json({ error: "Database error", details: err.message });
   }
 });
+
+// ✅ Attach other routers AFTER cart/menu routes
+app.use("/auth", authRouter);
+app.use("/api", reviewRouter);
+app.use("/api", adminRouter);
+app.use("/api/cart", cartRoutes);
 
 // Catch-all for undefined routes
 app.use((req, res) => {
   res.status(404).json({ error: "Route not found" });
 });
 
+// Test DB connection on server start
 (async () => {
   try {
     const db = await connectToDatabase();

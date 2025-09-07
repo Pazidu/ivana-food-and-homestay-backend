@@ -57,7 +57,7 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    const token = jwt.sign({ id: rows[0].id }, process.env.JWT_KEY, {
+    const token = jwt.sign({ id: rows[0].id }, process.env.JWT_SECRET, {
       expiresIn: "1h",
     });
 
@@ -82,7 +82,7 @@ const verifyToken = async (req, res, next) => {
     if (!token) {
       return res.status(403).json({ error: "No token provided" });
     }
-    const decoded = jwt.verify(token, process.env.JWT_KEY);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.userId = decoded.id;
     next();
   } catch (error) {
