@@ -80,12 +80,20 @@ router.get("/users", async (req, res) => {
 router.post("/users", async (req, res) => {
   try {
     const db = await connectToDatabase();
-    const { username, email, address, city, phone } = req.body;
+    const { username, email, address, city, phone, user_type } = req.body;
     const [result] = await db.query(
-      "INSERT INTO users (username, email, address, city, phone) VALUES (?, ?, ?, ?, ?)",
-      [username, email, address, city, phone]
+      "INSERT INTO users (username, email, address, city, phone, user_type) VALUES (?, ?, ?, ?, ?, ?)",
+      [username, email, address, city, phone, user_type]
     );
-    res.json({ id: result.insertId, username, email, address, city, phone });
+    res.json({
+      id: result.insertId,
+      username,
+      email,
+      address,
+      city,
+      phone,
+      user_type,
+    });
   } catch (err) {
     res.status(500).json(err);
   }
