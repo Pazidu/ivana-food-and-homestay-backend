@@ -107,58 +107,78 @@ router.get("/user/profile", verifyToken, async (req, res) => {
   }
 });
 
-// 1️⃣ Send OTP
 router.post("/send-otp", async (req, res) => {
-  const db = await connectToDatabase();
-  const { email } = req.body;
+  const { email, purpose } = req.body; // purpose = "verifyEmail" | "resetPassword"
 
   try {
-    // check if email exists in DB
-    const [rows] = await db.query("SELECT * FROM users WHERE email = ?", [
-      email,
-    ]);
-    if (rows.length === 0) {
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found" });
+    // Only check DB for password reset
+    if (purpose === "resetPassword") {
+      const db = await connectToDatabase();
+      const [rows] = await db.query("SELECT * FROM users WHERE email = ?", [
+        email,
+      ]);
+      if (rows.length === 0) {
+        return res
+          .status(404)
+          .json({ success: false, message: "User not found" });
+      }
     }
 
-    // generate OTP
+    // Generate OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    otpStore[email] = otp;
+    otpStore[email] = { otp, purpose, timestamp: Date.now() };
 
-    // configure nodemailer
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
         user: "pasidubhagya20@gmail.com",
-        pass: "vgho qfjf airt efah", // use Google App Password
+        pass: process.env.APP_PASSWORD,
       },
     });
+
+    const subject =
+      purpose === "verifyEmail" ? "Verify Your Email" : "Password Reset OTP";
 
     await transporter.sendMail({
       from: "pasidubhagya20@gmail.com",
       to: email,
-      subject: "Password Reset OTP",
+      subject,
       text: `Your OTP is ${otp}. It is valid for 5 minutes.`,
     });
 
     res.json({ success: true, message: "OTP sent to email" });
   } catch (err) {
-    console.error(err);
+    console.error("Send OTP error:", err);
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
 
-// 2️⃣ Verify OTP
+// 2️⃣ Unified Verify OTP
 router.post("/verify-otp", async (req, res) => {
+  const { email, otp, purpose } = req.body;
   const db = await connectToDatabase();
-  const { email, otp } = req.body;
 
-  if (otpStore[email] && otpStore[email] === otp) {
-    res.json({ success: true });
-  } else {
-    res.json({ success: false, message: "Invalid OTP" });
+  try {
+    if (
+      otpStore[email] &&
+      otpStore[email].otp === otp &&
+      otpStore[email].purpose === purpose
+    ) {
+      if (purpose === "verifyEmail") {
+        // ✅ mark user as verified
+        await db.query("UPDATE users SET verified = 1 WHERE email = ?", [
+          email,
+        ]);
+      }
+
+      delete otpStore[email]; // clear OTP after use
+      res.json({ success: true, message: "OTP verified successfully" });
+    } else {
+      res.json({ success: false, message: "Invalid or expired OTP" });
+    }
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Server error" });
   }
 });
 
