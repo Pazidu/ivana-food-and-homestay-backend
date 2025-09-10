@@ -6,11 +6,13 @@ import authRouter from "./routes/authRoutes.js";
 import reviewRouter from "./routes/reviewsRoutes.js";
 import adminRouter from "./routes/adminRoutes.js";
 import cartRoutes from "./routes/cartRoutes.js";
+import orderRoutes from "./routes/orderRoutes.js";
+import bodyParser from "body-parser";
 import { connectToDatabase } from "./lib/db.js";
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(bodyParser.json());
 
 // ✅ Menu route
 app.get("/api/foods/menu", async (req, res) => {
@@ -35,6 +37,7 @@ app.use("/auth", authRouter);
 app.use("/api", reviewRouter);
 app.use("/api", adminRouter);
 app.use("/api/cart", cartRoutes);
+app.use("/api/orders", orderRoutes);
 
 // Catch-all for undefined routes
 app.use((req, res) => {
