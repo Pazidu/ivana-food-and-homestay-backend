@@ -20,7 +20,7 @@ router.post("/", async (req, res) => {
     ]);
 
     res.status(201).json({
-      id: result.insertId,
+      id: result.insertId, // ✅ return id instead of _id
       userName,
       address,
       phone,
@@ -40,7 +40,7 @@ router.get("/", async (req, res) => {
     const [rows] = await db.query(sql);
 
     rows.forEach((row) => {
-      row.items = JSON.parse(row.items);
+      row.items = JSON.parse(row.items); // ✅ convert string to array
     });
 
     res.json(rows);
@@ -56,7 +56,7 @@ router.delete("/:id", async (req, res) => {
     const sql = "DELETE FROM orders WHERE id = ?";
     await db.query(sql, [req.params.id]);
 
-    res.json({ message: "Order deleted successfully" });
+    res.json({ message: "Order deleted successfully", id: req.params.id });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

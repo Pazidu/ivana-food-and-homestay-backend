@@ -7,6 +7,7 @@ import reviewRouter from "./routes/reviewsRoutes.js";
 import adminRouter from "./routes/adminRoutes.js";
 import cartRoutes from "./routes/cartRoutes.js";
 import orderRoutes from "./routes/orderRoutes.js";
+import userRoutes from "./routes/userRoutes.js";
 import bodyParser from "body-parser";
 import { connectToDatabase } from "./lib/db.js";
 
@@ -38,6 +39,7 @@ app.use("/api", reviewRouter);
 app.use("/api", adminRouter);
 app.use("/api/cart", cartRoutes);
 app.use("/api/orders", orderRoutes);
+app.use("/api/users", userRoutes);
 
 // Catch-all for undefined routes
 app.use((req, res) => {
