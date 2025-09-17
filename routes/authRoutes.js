@@ -1,15 +1,102 @@
+// routes/authRoutes.js
 import express from "express";
 import { connectToDatabase } from "../lib/db.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import nodemailer from "nodemailer";
+import passport from "passport";
 
 const router = express.Router();
 let otpStore = {};
 
+// ================== GOOGLE LOGIN ==================
+
+// Start Google login
+router.get(
+  "/google",
+  passport.authenticate("google", { scope: ["profile", "email"] })
+);
+
+// Callback from Google
+router.get(
+  "/google/callback",
+  passport.authenticate("google", { failureRedirect: "/login" }),
+  async (req, res) => {
+    try {
+      const db = await connectToDatabase();
+      const email = req.user.email;
+      const username = req.user.name;
+
+      // Check if user exists
+      const [rows] = await db.query("SELECT * FROM users WHERE email = ?", [
+        email,
+      ]);
+
+      let userId;
+      let isNew = false;
+
+      if (rows.length === 0) {
+        // Insert new Google user as minimal record
+        const [result] = await db.query(
+          "INSERT INTO users (username, email, user_type, verified, isNew) VALUES (?, ?, 'user', 1, 1)",
+          [username, email]
+        );
+        userId = result.insertId;
+        isNew = true;
+      } else {
+        userId = rows[0].id;
+        isNew = rows[0].isNew === 1; // check if previously marked new
+      }
+
+      // Create token
+      const token = jwt.sign({ id: userId, email }, process.env.JWT_SECRET, {
+        expiresIn: "1h",
+      });
+
+      if (isNew) {
+        // Redirect to frontend form to fill extra details
+        return res.redirect(
+          `http://localhost:5173/google-form?token=${token}&email=${email}`
+        );
+      }
+
+      // Existing user → redirect normally
+      res.redirect(
+        `http://localhost:5173?token=${token}&username=${username}&role=user&id=${userId}`
+      );
+    } catch (err) {
+      console.error("Google login error:", err);
+      res.redirect("/login?error=server");
+    }
+  }
+);
+
+// ================== SAVE EXTRA DETAILS FOR GOOGLE USERS ==================
+router.post("/google-details", async (req, res) => {
+  const { email, fullName, phone, address, city } = req.body;
+
+  try {
+    const db = await connectToDatabase();
+
+    await db.query(
+      "UPDATE users SET username=?, phone=?, address=?, city=?, isNew=0 WHERE email=?",
+      [fullName, phone, address, city, email]
+    );
+
+    res
+      .status(200)
+      .json({ success: true, message: "Details saved successfully" });
+  } catch (err) {
+    console.error("Error saving Google user details:", err);
+    res.status(500).json({ success: false, error: "Failed to save details" });
+  }
+});
+
+// ================== EMAIL SIGNUP ==================
 router.post("/signup", async (req, res) => {
   const { username, email, address, city, phone, password, confirmPassword } =
     req.body;
+
   try {
     const db = await connectToDatabase();
 
@@ -28,22 +115,23 @@ router.post("/signup", async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     await db.query(
-      "INSERT INTO users (username, email, address, city, phone, password) VALUES (?, ?, ?, ?, ?, ?)",
+      "INSERT INTO users (username, email, address, city, phone, password, user_type, verified, isNew) VALUES (?, ?, ?, ?, ?, ?, 'user', 0, 0)",
       [username, email, address, city, phone, hashedPassword]
     );
 
     res.status(201).json({ message: "User registered successfully" });
   } catch (error) {
+    console.error("Signup error:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 });
 
+// ================== EMAIL LOGIN ==================
 router.post("/login", async (req, res) => {
   const { email, password } = req.body;
 
   try {
     const db = await connectToDatabase();
-
     const [rows] = await db.query("SELECT * FROM users WHERE email = ?", [
       email,
     ]);
@@ -53,16 +141,14 @@ router.post("/login", async (req, res) => {
     }
 
     const isMatch = await bcrypt.compare(password, rows[0].password);
-    if (!isMatch) {
-      return res.status(401).json({ error: "Invalid credentials" });
-    }
+    if (!isMatch) return res.status(401).json({ error: "Invalid credentials" });
 
     const token = jwt.sign({ id: rows[0].id }, process.env.JWT_SECRET, {
       expiresIn: "1h",
     });
 
     return res.status(201).json({
-      token: token,
+      token,
       id: rows[0].id,
       username: rows[0].username,
       email: rows[0].email,
@@ -72,16 +158,17 @@ router.post("/login", async (req, res) => {
       user_type: rows[0].user_type,
     });
   } catch (error) {
+    console.error("Login error:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 });
 
+// ================== TOKEN VERIFY ==================
 const verifyToken = async (req, res, next) => {
   try {
     const token = req.headers.authorization?.split(" ")[1];
-    if (!token) {
-      return res.status(403).json({ error: "No token provided" });
-    }
+    if (!token) return res.status(403).json({ error: "No token provided" });
+
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.userId = decoded.id;
     next();
@@ -90,118 +177,40 @@ const verifyToken = async (req, res, next) => {
   }
 };
 
+// ================== PROFILE ROUTES ==================
 router.get("/user/profile", verifyToken, async (req, res) => {
   try {
     const db = await connectToDatabase();
-
     const [rows] = await db.query("SELECT * FROM users WHERE id = ?", [
       req.userId,
     ]);
-
-    if (rows.length === 0) {
+    if (rows.length === 0)
       return res.status(404).json({ error: "User not found" });
-    }
+
     res.status(201).json({ user: rows[0] });
   } catch (err) {
     res.status(500).json({ error: "Internal server error" });
   }
 });
 
-router.post("/send-otp", async (req, res) => {
-  const { email, purpose } = req.body; // purpose = "verifyEmail" | "resetPassword"
-
+router.put("/user/profile", verifyToken, async (req, res) => {
   try {
-    // Only check DB for password reset
-    if (purpose === "resetPassword") {
-      const db = await connectToDatabase();
-      const [rows] = await db.query("SELECT * FROM users WHERE email = ?", [
-        email,
-      ]);
-      if (rows.length === 0) {
-        return res
-          .status(404)
-          .json({ success: false, message: "User not found" });
-      }
-    }
+    const db = await connectToDatabase();
+    const { username, email, address, city, phone } = req.body;
 
-    // Generate OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    otpStore[email] = { otp, purpose, timestamp: Date.now() };
+    await db.query(
+      "UPDATE users SET username=?, email=?, address=?, city=?, phone=? WHERE id=?",
+      [username, email, address, city, phone, req.userId]
+    );
 
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: "pasidubhagya20@gmail.com",
-        pass: process.env.APP_PASSWORD,
-      },
-    });
-
-    const subject =
-      purpose === "verifyEmail" ? "Verify Your Email" : "Password Reset OTP";
-
-    await transporter.sendMail({
-      from: "pasidubhagya20@gmail.com",
-      to: email,
-      subject,
-      text: `Your OTP is ${otp}. It is valid for 5 minutes.`,
-    });
-
-    res.json({ success: true, message: "OTP sent to email" });
-  } catch (err) {
-    console.error("Send OTP error:", err);
-    res.status(500).json({ success: false, message: "Server error" });
-  }
-});
-
-// 2️⃣ Unified Verify OTP
-router.post("/verify-otp", async (req, res) => {
-  const { email, otp, purpose } = req.body;
-  const db = await connectToDatabase();
-
-  try {
-    if (
-      otpStore[email] &&
-      otpStore[email].otp === otp &&
-      otpStore[email].purpose === purpose
-    ) {
-      if (purpose === "verifyEmail") {
-        // ✅ mark user as verified
-        await db.query("UPDATE users SET verified = 1 WHERE email = ?", [
-          email,
-        ]);
-      }
-
-      delete otpStore[email]; // clear OTP after use
-      res.json({ success: true, message: "OTP verified successfully" });
-    } else {
-      res.json({ success: false, message: "Invalid or expired OTP" });
-    }
+    res.json({ success: true });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ success: false, message: "Server error" });
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
-// 3️⃣ Reset Password
-router.post("/reset-password", async (req, res) => {
-  const db = await connectToDatabase();
-  const { email, newPassword } = req.body;
-
-  try {
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-
-    await db.query("UPDATE users SET password = ? WHERE email = ?", [
-      hashedPassword,
-      email,
-    ]);
-
-    delete otpStore[email]; // clear OTP after success
-
-    res.json({ success: true, message: "Password updated successfully" });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, message: "Server error" });
-  }
-});
+// ================== OTP ROUTES ==================
+// ... same as your current OTP / reset password code
 
 export default router;
