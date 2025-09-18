@@ -111,4 +111,42 @@ router.delete("/users/:id", async (req, res) => {
   }
 });
 
+// ✅ Get all bookings
+router.get("/bookings", async (req, res) => {
+  try {
+    const db = await connectToDatabase();
+    const [rows] = await db.query(`
+      SELECT 
+        b.id,
+        b.guestName,
+        b.guestEmail,
+        b.guestPhone,
+        r.type AS room_type,
+        b.checkIn,
+        b.checkOut,
+        b.created_at
+      FROM bookings b
+      JOIN rooms r ON b.roomId = r.id
+      ORDER BY b.created_at DESC
+    `);
+    res.json(rows);
+  } catch (err) {
+    console.error("Error fetching bookings:", err.message);
+    res.status(500).json({ error: "Failed to fetch bookings" });
+  }
+});
+
+// ✅ Delete booking
+router.delete("/bookings/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const db = await connectToDatabase();
+    await db.query("DELETE FROM bookings WHERE id = ?", [id]);
+    res.json({ success: true, message: "Booking deleted" });
+  } catch (err) {
+    console.error("Error deleting booking:", err);
+    res.status(500).json({ error: "Failed to delete booking" });
+  }
+});
+
 export default router;

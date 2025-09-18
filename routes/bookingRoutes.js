@@ -8,21 +8,22 @@ router.get("/", async (req, res) => {
   try {
     const pool = await connectToDatabase();
 
-    // Parse dates from query (checkIn, checkOut)
+    // Parse dates from query
     const { checkIn, checkOut } = req.query;
 
-    let roomsQuery = "SELECT * FROM rooms";
-    const [rooms] = await pool.query(roomsQuery);
+    const [rooms] = await pool.query("SELECT * FROM rooms");
 
     const roomsWithAvailability = await Promise.all(
       rooms.map(async (room) => {
         let bookedCount = 0;
 
         if (checkIn && checkOut) {
-          // Count only overlapping bookings for the given date range
           const [bookings] = await pool.query(
-            "SELECT COUNT(*) AS bookedCount FROM bookings WHERE roomId = ? AND NOT (checkOut < CURDATE() OR checkIn > CURDATE())",
-            [room.id]
+            `SELECT COUNT(*) AS bookedCount
+             FROM bookings
+             WHERE roomId = ?
+             AND (checkIn <= ? AND checkOut >= ?)`,
+            [room.id, checkOut, checkIn]
           );
           bookedCount = bookings[0].bookedCount;
         }
