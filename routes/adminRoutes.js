@@ -149,4 +149,25 @@ router.delete("/bookings/:id", async (req, res) => {
   }
 });
 
+// Update only user_type
+router.put("/users/:id", async (req, res) => {
+  try {
+    const db = await connectToDatabase();
+    const { id } = req.params;
+    const { user_type } = req.body;
+
+    if (!user_type) {
+      return res.status(400).json({ error: "user_type is required" });
+    }
+
+    await db.query("UPDATE users SET user_type=? WHERE id=?", [user_type, id]);
+
+    const [rows] = await db.query("SELECT * FROM users WHERE id=?", [id]);
+    res.json(rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json(err);
+  }
+});
+
 export default router;
