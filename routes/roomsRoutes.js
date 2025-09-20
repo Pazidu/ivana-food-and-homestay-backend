@@ -4,14 +4,13 @@ import { connectToDatabase } from "../lib/db.js";
 const router = express.Router();
 
 // GET all rooms
-router.get("/", async (req, res) => {
+router.get("/all", async (req, res) => {
   try {
     const pool = await connectToDatabase();
     const [rows] = await pool.query("SELECT * FROM rooms");
-    // Convert facilities string to array
     const rooms = rows.map((r) => ({
       ...r,
-      facilities: r.facilities.split(","),
+      facilities: r.facilities ? r.facilities.split(",") : [],
     }));
     res.json({ rooms });
   } catch (err) {
@@ -36,12 +35,11 @@ router.get("/", async (req, res) => {
 
     const roomsWithAvailability = await Promise.all(
       rooms.map(async (room) => {
-        // Count overlapping bookings
         const [bookings] = await pool.query(
           `SELECT COUNT(*) AS bookedCount 
            FROM bookings 
            WHERE roomId = ? 
-           AND NOT (checkOut < ? OR checkIn > ?)`,
+           AND NOT (checkOut < ? OR checkIn > ?);`,
           [room.id, checkIn, checkOut]
         );
 
