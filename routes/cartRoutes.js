@@ -121,4 +121,39 @@ router.delete("/:id", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Database error", details: err.message });
   }
 });
+
+// ✅ Update item quantity
+router.put("/:id", authenticateToken, async (req, res) => {
+  try {
+    const db = await connectToDatabase();
+    const userId = req.user.id;
+    const cartItemId = req.params.id;
+    const { quantity } = req.body;
+
+    if (!quantity || quantity < 1) {
+      return res.status(400).json({ error: "Quantity must be at least 1" });
+    }
+
+    // Update only if the item belongs to logged-in user
+    await db.query(
+      "UPDATE cart SET quantity = ? WHERE id = ? AND user_id = ?",
+      [quantity, cartItemId, userId]
+    );
+
+    const [rows] = await db.query(
+      "SELECT id, item_id, item_name, description, unit_price, quantity FROM cart WHERE id = ? AND user_id = ?",
+      [cartItemId, userId]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ message: "Item not found in your cart" });
+    }
+
+    res.json(rows[0]); // send updated item back
+  } catch (err) {
+    console.error("Error updating quantity:", err.message);
+    res.status(500).json({ error: "Database error", details: err.message });
+  }
+});
+
 export default router;
