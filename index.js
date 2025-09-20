@@ -14,6 +14,7 @@ import orderRoutes from "./routes/orderRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import bookingsRoutes from "./routes/bookingRoutes.js";
 import roomsRoutes from "./routes/roomsRoutes.js";
+import menuRoutes from "./routes/menuRoutes.js";
 
 import bodyParser from "body-parser";
 import { connectToDatabase } from "./lib/db.js";
@@ -85,23 +86,23 @@ app.get(
   }
 );
 
-// ✅ Menu route
-app.get("/api/foods/menu", async (req, res) => {
-  const { type } = req.query;
-  if (!type)
-    return res.status(400).json({ error: "Missing 'type' query parameter" });
+// // ✅ Menu route
+// app.get("/api/foods/menu", async (req, res) => {
+//   const { type } = req.query;
+//   if (!type)
+//     return res.status(400).json({ error: "Missing 'type' query parameter" });
 
-  try {
-    const db = await connectToDatabase();
-    const [results] = await db.query("SELECT * FROM menu WHERE type = ?", [
-      type,
-    ]);
-    res.json(results);
-  } catch (err) {
-    console.error("Menu DB error:", err.message);
-    res.status(500).json({ error: "Database error", details: err.message });
-  }
-});
+//   try {
+//     // const db = await connectToDatabase();
+//     const [results] = await db.query("SELECT * FROM menu WHERE type = ?", [
+//       type,
+//     ]);
+//     res.json(results);
+//   } catch (err) {
+//     console.error("Menu DB error:", err.message);
+//     res.status(500).json({ error: "Database error", details: err.message });
+//   }
+// });
 
 // ✅ Attach other routers AFTER cart/menu routes
 app.use("/auth", authRouter);
@@ -112,6 +113,7 @@ app.use("/api/orders", orderRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/bookings", bookingsRoutes);
 app.use("/api/rooms", roomsRoutes);
+app.use("/api", menuRoutes);
 
 // Catch-all for undefined routes
 app.use((req, res) => {

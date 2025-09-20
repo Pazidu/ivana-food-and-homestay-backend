@@ -13,6 +13,21 @@ router.get("/menu", async (req, res) => {
     res.status(500).json(err);
   }
 });
+// Get menu items for users (only visible)
+// router.get("/menu", async (req, res) => {
+//   try {
+//     const db = await connectToDatabase();
+//     const { type } = req.query;
+//     const [results] = await db.query(
+//       "SELECT * FROM menu WHERE type = ? AND is_hidden = 0",
+//       [type]
+//     );
+//     res.json(results);
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ error: "Failed to fetch menu items" });
+//   }
+// });
 
 // Add a new menu item
 router.post("/menu", async (req, res) => {
@@ -64,7 +79,21 @@ router.put("/menu/:id", async (req, res) => {
     res.status(500).json(err);
   }
 });
+// Hide/unhide menu item
+router.put("/menu/hide/:id", async (req, res) => {
+  try {
+    const db = await connectToDatabase();
+    const { id } = req.params;
+    const { hide } = req.body; // expect { hide: true/false }
 
+    await db.query("UPDATE menu SET is_hidden=? WHERE id=?", [hide, id]);
+
+    const [rows] = await db.query("SELECT * FROM menu WHERE id=?", [id]);
+    res.json(rows[0]);
+  } catch (err) {
+    res.status(500).json(err);
+  }
+});
 // Get all users
 router.get("/users", async (req, res) => {
   try {
