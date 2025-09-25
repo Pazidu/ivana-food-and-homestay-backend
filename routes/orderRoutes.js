@@ -32,7 +32,7 @@ router.post("/", async (req, res) => {
   }
 });
 
-// Get all orders
+// Get all orders (ongoing + completed)
 router.get("/", async (req, res) => {
   try {
     const db = await connectToDatabase();
@@ -40,7 +40,7 @@ router.get("/", async (req, res) => {
     const [rows] = await db.query(sql);
 
     rows.forEach((row) => {
-      row.items = JSON.parse(row.items); // ✅ convert string to array
+      row.items = JSON.parse(row.items);
     });
 
     res.json(rows);
@@ -49,14 +49,14 @@ router.get("/", async (req, res) => {
   }
 });
 
-// Delete order
-router.delete("/:id", async (req, res) => {
+// Mark order as completed
+router.put("/:id/complete", async (req, res) => {
   try {
     const db = await connectToDatabase();
-    const sql = "DELETE FROM orders WHERE id = ?";
+    const sql = "UPDATE orders SET status = 'completed' WHERE id = ?";
     await db.query(sql, [req.params.id]);
 
-    res.json({ message: "Order deleted successfully", id: req.params.id });
+    res.json({ message: "Order marked as completed", id: req.params.id });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
