@@ -36,7 +36,7 @@ router.get("/", authenticateToken, async (req, res) => {
   }
 });
 
-// ✅ Add to cart API
+// ✅ Add to cart API (fixed to increment quantity if item exists)
 router.post("/add", authenticateToken, async (req, res) => {
   try {
     const db = await connectToDatabase();
@@ -66,18 +66,33 @@ router.post("/add", authenticateToken, async (req, res) => {
           ? menuItem.regular_price
           : menuItem.large_price;
 
-      // Insert into cart
-      await db.query(
-        "INSERT INTO cart (user_id, item_id, item_name, description, unit_price, quantity) VALUES (?, ?, ?, ?, ?, ?)",
-        [
-          userId,
-          item.item_id,
-          menuItem.name,
-          item.description,
-          unit_price,
-          item.quantity,
-        ]
+      // Check if item already exists in cart for this user
+      const [existingRows] = await db.query(
+        "SELECT id, quantity FROM cart WHERE user_id = ? AND item_id = ? AND description = ?",
+        [userId, item.item_id, item.description]
       );
+
+      if (existingRows.length > 0) {
+        // Increment quantity
+        const newQuantity = existingRows[0].quantity + item.quantity;
+        await db.query("UPDATE cart SET quantity = ? WHERE id = ?", [
+          newQuantity,
+          existingRows[0].id,
+        ]);
+      } else {
+        // Insert new row
+        await db.query(
+          "INSERT INTO cart (user_id, item_id, item_name, description, unit_price, quantity) VALUES (?, ?, ?, ?, ?, ?)",
+          [
+            userId,
+            item.item_id,
+            menuItem.name,
+            item.description,
+            unit_price,
+            item.quantity,
+          ]
+        );
+      }
     }
 
     res.json({ success: true, inserted: items.length });
