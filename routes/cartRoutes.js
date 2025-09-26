@@ -36,12 +36,12 @@ router.get("/", authenticateToken, async (req, res) => {
   }
 });
 
-// ✅ Add to cart API
+// ✅ Add to cart API (merge if same item already exists)
 router.post("/add", authenticateToken, async (req, res) => {
   try {
     const db = await connectToDatabase();
     const items = req.body; // [{ item_id, description, quantity }, ...]
-    const userId = req.user.id; // Logged-in user's ID from token
+    const userId = req.user.id;
 
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: "Invalid data" });
@@ -66,21 +66,35 @@ router.post("/add", authenticateToken, async (req, res) => {
           ? menuItem.regular_price
           : menuItem.large_price;
 
-      // Insert into cart
-      await db.query(
-        "INSERT INTO cart (user_id, item_id, item_name, description, unit_price, quantity) VALUES (?, ?, ?, ?, ?, ?)",
-        [
-          userId,
-          item.item_id,
-          menuItem.name,
-          item.description,
-          unit_price,
-          item.quantity,
-        ]
+      // 🔹 Check if this item already exists in user's cart
+      const [existing] = await db.query(
+        "SELECT id, quantity FROM cart WHERE user_id = ? AND item_id = ? AND description = ?",
+        [userId, item.item_id, item.description]
       );
+
+      if (existing.length > 0) {
+        // Update quantity if exists
+        await db.query("UPDATE cart SET quantity = quantity + ? WHERE id = ?", [
+          item.quantity,
+          existing[0].id,
+        ]);
+      } else {
+        // Insert new row if not exists
+        await db.query(
+          "INSERT INTO cart (user_id, item_id, item_name, description, unit_price, quantity) VALUES (?, ?, ?, ?, ?, ?)",
+          [
+            userId,
+            item.item_id,
+            menuItem.name,
+            item.description,
+            unit_price,
+            item.quantity,
+          ]
+        );
+      }
     }
 
-    res.json({ success: true, inserted: items.length });
+    res.json({ success: true, message: "Items added/updated successfully" });
   } catch (err) {
     console.error("Error inserting cart:", err.message);
     res.status(500).json({ error: "Database error", details: err.message });
