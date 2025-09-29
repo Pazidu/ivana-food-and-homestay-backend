@@ -5,6 +5,8 @@ import jwt from "jsonwebtoken";
 import session from "express-session";
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
+import admin from "firebase-admin";
+import serviceAccount from "./contra-cloud-firebase-adminsdk-ow8ha-7792acf400.json" assert { type: "json" };
 
 import authRouter from "./routes/authRoutes.js";
 import reviewRouter from "./routes/reviewsRoutes.js";
@@ -35,6 +37,11 @@ app.use(
 // ✅ Initialize Passport
 app.use(passport.initialize());
 app.use(passport.session());
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+  storageBucket: "contra-cloud.firebasestorage.app",
+});
 
 // 🔹 Google OAuth Strategy
 passport.use(

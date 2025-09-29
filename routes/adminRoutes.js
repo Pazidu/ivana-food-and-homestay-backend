@@ -1,9 +1,14 @@
 import express from "express";
 import { connectToDatabase } from "../lib/db.js"; // ✅ use shared db
+import admin from "firebase-admin";
+import path from "path";
+import fs from "fs";
+import multer from "multer";
 
 const router = express.Router();
+const upload = multer({ dest: "uploads/" });
 
-// Get all menu items
+// Get all menu items (Admin)
 router.get("/menu", async (req, res) => {
   try {
     const db = await connectToDatabase();
@@ -34,10 +39,12 @@ router.post("/menu", async (req, res) => {
   try {
     const db = await connectToDatabase();
     const { name, type, regular_price, large_price, image_link } = req.body;
+
     const [result] = await db.query(
       "INSERT INTO menu (name, type, regular_price, large_price, image_link) VALUES (?, ?, ?, ?, ?)",
       [name, type, regular_price, large_price, image_link]
     );
+
     res.json({
       id: result.insertId,
       name,
@@ -47,7 +54,35 @@ router.post("/menu", async (req, res) => {
       image_link,
     });
   } catch (err) {
-    res.status(500).json(err);
+    console.error(err);
+    res
+      .status(500)
+      .json({ error: "Failed to add menu item", details: err.message });
+  }
+});
+
+// Upload image to Firebase
+router.post("/menu/upload-image", upload.single("image"), async (req, res) => {
+  try {
+    const bucket = admin.storage().bucket();
+    const localFilePath = req.file.path;
+    const destination = `menu-images/${Date.now()}-${req.file.originalname}`;
+
+    const [file] = await bucket.upload(localFilePath, {
+      destination,
+      metadata: { contentType: req.file.mimetype },
+    });
+
+    await file.makePublic();
+    const publicUrl = `https://storage.googleapis.com/${bucket.name}/${file.name}`;
+
+    // Delete local temp file
+    fs.unlinkSync(localFilePath);
+
+    res.json({ url: publicUrl });
+  } catch (err) {
+    console.error("Firebase upload error:", err);
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -69,16 +104,43 @@ router.put("/menu/:id", async (req, res) => {
     const db = await connectToDatabase();
     const { id } = req.params;
     const { name, type, regular_price, large_price, image_link } = req.body;
+
+    // Get old image_link
+    const [rows] = await db.query("SELECT image_link FROM menu WHERE id=?", [
+      id,
+    ]);
+    const oldImageLink = rows[0]?.image_link;
+
     await db.query(
       "UPDATE menu SET name=?, type=?, regular_price=?, large_price=?, image_link=? WHERE id=?",
       [name, type, regular_price, large_price, image_link, id]
     );
-    const [rows] = await db.query("SELECT * FROM menu WHERE id=?", [id]);
-    res.json(rows[0]);
+
+    // Optional: delete old image from Supabase if a new one is uploaded
+    if (image_link && oldImageLink && image_link !== oldImageLink) {
+      try {
+        // Extract path inside bucket from URL
+        const oldPath = oldImageLink.split(
+          ".supabase.co/storage/v1/object/public/"
+        )[1];
+        if (oldPath) {
+          await supabase.storage.from("public").remove([oldPath]);
+        }
+      } catch (err) {
+        console.error("Failed to delete old image from Supabase:", err.message);
+      }
+    }
+
+    const [updatedRows] = await db.query("SELECT * FROM menu WHERE id=?", [id]);
+    res.json(updatedRows[0]);
   } catch (err) {
-    res.status(500).json(err);
+    console.error(err);
+    res
+      .status(500)
+      .json({ error: "Failed to update menu item", details: err.message });
   }
 });
+
 // Hide/unhide menu item
 router.put("/menu/hide/:id", async (req, res) => {
   try {
@@ -196,6 +258,40 @@ router.put("/users/:id", async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json(err);
+  }
+});
+
+router.get("/test-upload", async (req, res) => {
+  try {
+    const bucket = admin.storage().bucket();
+
+    // Path to your local image
+    const localFilePath = path.join(process.cwd(), "test", "test.png");
+    const destination = `uploads/sample-image-${Date.now()}.png`;
+
+    // Upload image
+    const [file] = await bucket.upload(localFilePath, {
+      destination,
+      metadata: {
+        contentType: "image/png",
+      },
+    });
+
+    // Make the file public
+    await file.makePublic();
+
+    // Public URL
+    const publicUrl = `https://storage.googleapis.com/${bucket.name}/${file.name}`;
+
+    res.json({
+      message: "Image uploaded successfully",
+      url: publicUrl,
+    });
+  } catch (err) {
+    console.error("Firebase upload error:", err);
+    res
+      .status(500)
+      .json({ error: "Firebase upload failed", details: err.message });
   }
 });
 
