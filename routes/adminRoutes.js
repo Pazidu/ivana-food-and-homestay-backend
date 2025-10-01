@@ -1,5 +1,5 @@
 import express from "express";
-import { connectToDatabase } from "../lib/db.js"; // ✅ use shared db
+import { connectToDatabase } from "../lib/db.js";
 import admin from "firebase-admin";
 import path from "path";
 import fs from "fs";
@@ -7,6 +7,9 @@ import multer from "multer";
 
 const router = express.Router();
 const upload = multer({ dest: "uploads/" });
+const bucket = admin.storage().bucket();
+
+// ================= Menu Routes =================
 
 // Get all menu items (Admin)
 router.get("/menu", async (req, res) => {
@@ -18,21 +21,6 @@ router.get("/menu", async (req, res) => {
     res.status(500).json(err);
   }
 });
-// Get menu items for users (only visible)
-// router.get("/menu", async (req, res) => {
-//   try {
-//     const db = await connectToDatabase();
-//     const { type } = req.query;
-//     const [results] = await db.query(
-//       "SELECT * FROM menu WHERE type = ? AND is_hidden = 0",
-//       [type]
-//     );
-//     res.json(results);
-//   } catch (err) {
-//     console.error(err);
-//     res.status(500).json({ error: "Failed to fetch menu items" });
-//   }
-// });
 
 // Add a new menu item
 router.post("/menu", async (req, res) => {
@@ -54,7 +42,6 @@ router.post("/menu", async (req, res) => {
       image_link,
     });
   } catch (err) {
-    console.error(err);
     res
       .status(500)
       .json({ error: "Failed to add menu item", details: err.message });
@@ -64,7 +51,6 @@ router.post("/menu", async (req, res) => {
 // Upload image to Firebase
 router.post("/menu/upload-image", upload.single("image"), async (req, res) => {
   try {
-    const bucket = admin.storage().bucket();
     const localFilePath = req.file.path;
     const destination = `menu-images/${Date.now()}-${req.file.originalname}`;
 
@@ -76,25 +62,10 @@ router.post("/menu/upload-image", upload.single("image"), async (req, res) => {
     await file.makePublic();
     const publicUrl = `https://storage.googleapis.com/${bucket.name}/${file.name}`;
 
-    // Delete local temp file
-    fs.unlinkSync(localFilePath);
-
+    fs.unlinkSync(localFilePath); // delete local temp file
     res.json({ url: publicUrl });
   } catch (err) {
-    console.error("Firebase upload error:", err);
     res.status(500).json({ error: err.message });
-  }
-});
-
-// Delete menu item
-router.delete("/menu/:id", async (req, res) => {
-  try {
-    const db = await connectToDatabase();
-    const { id } = req.params;
-    await db.query("DELETE FROM menu WHERE id = ?", [id]);
-    res.json({ message: "Item deleted successfully" });
-  } catch (err) {
-    res.status(500).json(err);
   }
 });
 
@@ -105,39 +76,29 @@ router.put("/menu/:id", async (req, res) => {
     const { id } = req.params;
     const { name, type, regular_price, large_price, image_link } = req.body;
 
-    // Get old image_link
-    const [rows] = await db.query("SELECT image_link FROM menu WHERE id=?", [
-      id,
-    ]);
-    const oldImageLink = rows[0]?.image_link;
-
     await db.query(
       "UPDATE menu SET name=?, type=?, regular_price=?, large_price=?, image_link=? WHERE id=?",
       [name, type, regular_price, large_price, image_link, id]
     );
 
-    // Optional: delete old image from Supabase if a new one is uploaded
-    if (image_link && oldImageLink && image_link !== oldImageLink) {
-      try {
-        // Extract path inside bucket from URL
-        const oldPath = oldImageLink.split(
-          ".supabase.co/storage/v1/object/public/"
-        )[1];
-        if (oldPath) {
-          await supabase.storage.from("public").remove([oldPath]);
-        }
-      } catch (err) {
-        console.error("Failed to delete old image from Supabase:", err.message);
-      }
-    }
-
     const [updatedRows] = await db.query("SELECT * FROM menu WHERE id=?", [id]);
     res.json(updatedRows[0]);
   } catch (err) {
-    console.error(err);
     res
       .status(500)
       .json({ error: "Failed to update menu item", details: err.message });
+  }
+});
+
+// Delete menu item
+router.delete("/menu/:id", async (req, res) => {
+  try {
+    const db = await connectToDatabase();
+    const { id } = req.params;
+    await db.query("DELETE FROM menu WHERE id=?", [id]);
+    res.json({ message: "Item deleted successfully" });
+  } catch (err) {
+    res.status(500).json(err);
   }
 });
 
@@ -146,16 +107,18 @@ router.put("/menu/hide/:id", async (req, res) => {
   try {
     const db = await connectToDatabase();
     const { id } = req.params;
-    const { hide } = req.body; // expect { hide: true/false }
+    const { hide } = req.body;
 
     await db.query("UPDATE menu SET is_hidden=? WHERE id=?", [hide, id]);
-
     const [rows] = await db.query("SELECT * FROM menu WHERE id=?", [id]);
     res.json(rows[0]);
   } catch (err) {
     res.status(500).json(err);
   }
 });
+
+// ================= Users Routes =================
+
 // Get all users
 router.get("/users", async (req, res) => {
   try {
@@ -190,19 +153,39 @@ router.post("/users", async (req, res) => {
   }
 });
 
+// Update only user_type
+router.put("/users/:id", async (req, res) => {
+  try {
+    const db = await connectToDatabase();
+    const { id } = req.params;
+    const { user_type } = req.body;
+
+    if (!user_type)
+      return res.status(400).json({ error: "user_type is required" });
+
+    await db.query("UPDATE users SET user_type=? WHERE id=?", [user_type, id]);
+    const [rows] = await db.query("SELECT * FROM users WHERE id=?", [id]);
+    res.json(rows[0]);
+  } catch (err) {
+    res.status(500).json(err);
+  }
+});
+
 // Delete user
 router.delete("/users/:id", async (req, res) => {
   try {
     const db = await connectToDatabase();
     const { id } = req.params;
-    await db.query("DELETE FROM users WHERE id = ?", [id]);
+    await db.query("DELETE FROM users WHERE id=?", [id]);
     res.json({ message: "User deleted successfully" });
   } catch (err) {
     res.status(500).json(err);
   }
 });
 
-// ✅ Get all bookings
+// ================= Bookings Routes =================
+
+// Get all bookings
 router.get("/bookings", async (req, res) => {
   try {
     const db = await connectToDatabase();
@@ -222,76 +205,173 @@ router.get("/bookings", async (req, res) => {
     `);
     res.json(rows);
   } catch (err) {
-    console.error("Error fetching bookings:", err.message);
     res.status(500).json({ error: "Failed to fetch bookings" });
   }
 });
 
-// ✅ Delete booking
+// Delete booking
 router.delete("/bookings/:id", async (req, res) => {
   try {
-    const { id } = req.params;
     const db = await connectToDatabase();
-    await db.query("DELETE FROM bookings WHERE id = ?", [id]);
+    const { id } = req.params;
+    await db.query("DELETE FROM bookings WHERE id=?", [id]);
     res.json({ success: true, message: "Booking deleted" });
   } catch (err) {
-    console.error("Error deleting booking:", err);
     res.status(500).json({ error: "Failed to delete booking" });
   }
 });
 
-// Update only user_type
-router.put("/users/:id", async (req, res) => {
+// ================= Gallery Routes =================
+
+// Add new gallery image (pending by default)
+router.post("/gallery/add", upload.single("image"), async (req, res) => {
   try {
-    const db = await connectToDatabase();
-    const { id } = req.params;
-    const { user_type } = req.body;
+    const { name, phone, type } = req.body; // type = "foods" or "homestay"
+    const file = req.file;
+    if (!file) return res.status(400).json({ error: "No file uploaded" });
 
-    if (!user_type) {
-      return res.status(400).json({ error: "user_type is required" });
-    }
+    const filePath = `${type}-gallery/${Date.now()}_${file.originalname}`;
+    const blob = bucket.file(filePath);
+    const blobStream = blob.createWriteStream({
+      metadata: { contentType: file.mimetype },
+    });
 
-    await db.query("UPDATE users SET user_type=? WHERE id=?", [user_type, id]);
+    blobStream.on("error", (err) => {
+      console.error("Upload error:", err);
+      res.status(500).json({ error: "Upload failed" });
+    });
 
-    const [rows] = await db.query("SELECT * FROM users WHERE id=?", [id]);
-    res.json(rows[0]);
+    blobStream.on("finish", async () => {
+      try {
+        await blob.makePublic(); // 🔹 Make file public
+
+        const db = await connectToDatabase();
+        const [result] = await db.query(
+          "INSERT INTO foods_gallery (name, phone, image_link, type, status) VALUES (?, ?, ?, ?, 'pending')",
+          [name, phone, filePath, type]
+        );
+
+        res.json({
+          message: "Image uploaded successfully",
+          id: result.insertId,
+          name,
+          phone,
+          type,
+          image_link: `https://storage.googleapis.com/${bucket.name}/${filePath}`,
+          status: "pending",
+        });
+      } catch (err) {
+        console.error("Firebase public error:", err);
+        res
+          .status(500)
+          .json({ error: "Failed to make file public", details: err.message });
+      }
+    });
+
+    blobStream.end(file.buffer);
   } catch (err) {
     console.error(err);
-    res.status(500).json(err);
+    res
+      .status(500)
+      .json({ error: "Failed to upload image", details: err.message });
   }
 });
 
-router.get("/test-upload", async (req, res) => {
+// 🔹 Get pending images
+router.get("/gallery/pending", async (req, res) => {
   try {
-    const bucket = admin.storage().bucket();
+    const db = await connectToDatabase();
+    const [rows] = await db.query(
+      "SELECT * FROM foods_gallery WHERE status='pending' ORDER BY id DESC"
+    );
 
-    // Path to your local image
-    const localFilePath = path.join(process.cwd(), "test", "test.png");
-    const destination = `uploads/sample-image-${Date.now()}.png`;
+    const urls = rows.map((item) => ({
+      id: item.id,
+      name: item.name,
+      phone: item.phone,
+      type: item.type,
+      status: item.status,
+      image_link: `https://storage.googleapis.com/${bucket.name}/${item.image_link}`,
+    }));
 
-    // Upload image
-    const [file] = await bucket.upload(localFilePath, {
-      destination,
-      metadata: {
-        contentType: "image/png",
-      },
-    });
-
-    // Make the file public
-    await file.makePublic();
-
-    // Public URL
-    const publicUrl = `https://storage.googleapis.com/${bucket.name}/${file.name}`;
-
-    res.json({
-      message: "Image uploaded successfully",
-      url: publicUrl,
-    });
+    res.json(urls);
   } catch (err) {
-    console.error("Firebase upload error:", err);
-    res
-      .status(500)
-      .json({ error: "Firebase upload failed", details: err.message });
+    console.error("Pending fetch error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 🔹 Get approved images
+router.get("/gallery/approved", async (req, res) => {
+  try {
+    const db = await connectToDatabase();
+    const [rows] = await db.query(
+      "SELECT * FROM foods_gallery WHERE status='approved' ORDER BY id DESC"
+    );
+
+    const urls = rows.map((item) => ({
+      id: item.id,
+      name: item.name,
+      phone: item.phone,
+      type: item.type,
+      status: item.status,
+      image_link: `https://storage.googleapis.com/${bucket.name}/${item.image_link}`,
+    }));
+
+    res.json(urls);
+  } catch (err) {
+    console.error("Approved fetch error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Approve an image
+router.put("/gallery/:id/approve", async (req, res) => {
+  try {
+    const db = await connectToDatabase();
+    const { id } = req.params;
+    await db.query("UPDATE foods_gallery SET status='approved' WHERE id=?", [
+      id,
+    ]);
+    res.json({ message: "Image approved successfully" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Decline an image
+router.put("/gallery/:id/reject", async (req, res) => {
+  try {
+    const db = await connectToDatabase();
+    const { id } = req.params;
+    await db.query("UPDATE foods_gallery SET status='rejected' WHERE id=?", [
+      id,
+    ]);
+    res.json({ message: "Image declined" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Delete image
+router.delete("/gallery/:id", async (req, res) => {
+  try {
+    const db = await connectToDatabase();
+    const { id } = req.params;
+
+    const [rows] = await db.query(
+      "SELECT image_link FROM foods_gallery WHERE id=?",
+      [id]
+    );
+    if (!rows.length) return res.status(404).json({ error: "Image not found" });
+
+    const filePath = rows[0].image_link;
+    await bucket.file(filePath).delete();
+    await db.query("DELETE FROM foods_gallery WHERE id=?", [id]);
+
+    res.json({ message: "Image deleted successfully" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
