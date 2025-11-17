@@ -16,13 +16,14 @@ router.get("/gallery", async (req, res) => {
       "SELECT * FROM foods_gallery WHERE status='approved' ORDER BY id DESC"
     );
 
+    // Use stored signed URLs directly
     const urls = rows.map((item) => ({
       id: item.id,
       name: item.name,
       phone: item.phone,
       type: item.type,
       status: item.status,
-      image_link: `https://storage.googleapis.com/${bucket.name}/${item.image_link}`,
+      image_link: item.image_link, // already full URL
     }));
 
     res.json(urls);
@@ -54,12 +55,16 @@ router.post("/gallery/add", upload.single("image"), async (req, res) => {
 
     blobStream.on("finish", async () => {
       try {
-        await blob.makePublic(); // 🔹 Make file publicly accessible
+        // ✅ Instead of makePublic, generate a signed URL
+        const [signedUrl] = await blob.getSignedUrl({
+          action: "read",
+          expires: "03-09-2491", // long expiry date
+        });
 
         const db = await connectToDatabase();
         const [result] = await db.query(
           "INSERT INTO foods_gallery (name, phone, type, image_link, status) VALUES (?, ?, ?, ?, 'pending')",
-          [name, phone, type, filePath]
+          [name, phone, type, signedUrl] // store signed URL directly
         );
 
         res.json({
@@ -68,14 +73,15 @@ router.post("/gallery/add", upload.single("image"), async (req, res) => {
           name,
           phone,
           type,
-          image_link: `https://storage.googleapis.com/${bucket.name}/${filePath}`,
+          image_link: signedUrl,
           status: "pending",
         });
       } catch (err) {
-        console.error("Firebase public error:", err);
-        res
-          .status(500)
-          .json({ error: "Failed to make file public", details: err.message });
+        console.error("Firebase signed URL error:", err);
+        res.status(500).json({
+          error: "Failed to generate signed URL",
+          details: err.message,
+        });
       }
     });
 
