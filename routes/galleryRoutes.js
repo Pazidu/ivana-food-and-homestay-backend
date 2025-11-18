@@ -5,10 +5,13 @@ import admin from "../Firebase/admin.js";
 import { connectToDatabase } from "../lib/db.js";
 
 const router = express.Router();
-const bucket = admin.storage().bucket();
+const bucket = admin.storage().bucket("contra-cloud.appspot.com");
+console.log("Your Firebase Bucket Name:", bucket.name);
 const upload = multer({ storage: multer.memoryStorage() });
 
-// 🔹 Get full gallery (only approved for users)
+/* --------------------------------------------------------
+   GET Approved Images (Users)
+--------------------------------------------------------- */
 router.get("/gallery", async (req, res) => {
   try {
     const db = await connectToDatabase();
@@ -16,26 +19,51 @@ router.get("/gallery", async (req, res) => {
       "SELECT * FROM foods_gallery WHERE status='approved' ORDER BY id DESC"
     );
 
-    // Use stored signed URLs directly
-    const urls = rows.map((item) => ({
-      id: item.id,
-      name: item.name,
-      phone: item.phone,
-      type: item.type,
-      status: item.status,
-      image_link: item.image_link, // already full URL
-    }));
-
-    res.json(urls);
+    // No conversion needed, image_link is full signed URL already
+    res.json(rows);
   } catch (err) {
     console.error("Gallery fetch error:", err);
-    res
-      .status(500)
-      .json({ error: "Failed to fetch gallery", details: err.message });
+    res.status(500).json({ error: "Failed to fetch gallery" });
   }
 });
 
-// 🔹 Upload image (pending by default)
+/* --------------------------------------------------------
+   GET Pending Images (Admin)
+--------------------------------------------------------- */
+router.get("/gallery/pending", async (req, res) => {
+  try {
+    const db = await connectToDatabase();
+    const [rows] = await db.query(
+      "SELECT * FROM foods_gallery WHERE status='pending' ORDER BY id DESC"
+    );
+
+    res.json(rows);
+  } catch (err) {
+    console.error("Pending fetch error:", err);
+    res.status(500).json({ error: "Failed to fetch pending gallery" });
+  }
+});
+
+/* --------------------------------------------------------
+   GET Approved Images (Admin)
+--------------------------------------------------------- */
+router.get("/gallery/approved", async (req, res) => {
+  try {
+    const db = await connectToDatabase();
+    const [rows] = await db.query(
+      "SELECT * FROM foods_gallery WHERE status='approved' ORDER BY id DESC"
+    );
+
+    res.json(rows);
+  } catch (err) {
+    console.error("Approved fetch error:", err);
+    res.status(500).json({ error: "Failed to fetch approved gallery" });
+  }
+});
+
+/* --------------------------------------------------------
+   UPLOAD IMAGE
+--------------------------------------------------------- */
 router.post("/gallery/add", upload.single("image"), async (req, res) => {
   try {
     const { name, phone, type } = req.body;
@@ -55,20 +83,21 @@ router.post("/gallery/add", upload.single("image"), async (req, res) => {
 
     blobStream.on("finish", async () => {
       try {
-        // ✅ Instead of makePublic, generate a signed URL
+        // Generate signed URL for access
         const [signedUrl] = await blob.getSignedUrl({
           action: "read",
-          expires: "03-09-2491", // long expiry date
+          expires: "03-09-2491",
         });
 
+        // Store full signed URL directly in DB
         const db = await connectToDatabase();
         const [result] = await db.query(
           "INSERT INTO foods_gallery (name, phone, type, image_link, status) VALUES (?, ?, ?, ?, 'pending')",
-          [name, phone, type, signedUrl] // store signed URL directly
+          [name, phone, type, signedUrl]
         );
 
         res.json({
-          message: "Image uploaded successfully (waiting for admin approval)",
+          message: "Image uploaded successfully (pending approval)",
           id: result.insertId,
           name,
           phone,
@@ -77,7 +106,7 @@ router.post("/gallery/add", upload.single("image"), async (req, res) => {
           status: "pending",
         });
       } catch (err) {
-        console.error("Firebase signed URL error:", err);
+        console.error("Signed URL error:", err);
         res.status(500).json({
           error: "Failed to generate signed URL",
           details: err.message,
@@ -87,10 +116,8 @@ router.post("/gallery/add", upload.single("image"), async (req, res) => {
 
     blobStream.end(file.buffer);
   } catch (err) {
-    console.error("Upload error:", err.message);
-    res
-      .status(500)
-      .json({ error: "Failed to upload image", details: err.message });
+    console.error("Upload error:", err);
+    res.status(500).json({ error: "Upload failed" });
   }
 });
 
