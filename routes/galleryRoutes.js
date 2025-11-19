@@ -95,12 +95,22 @@ router.delete("/gallery/:id", async (req, res) => {
     const { id } = req.params;
     const db = await connectToDatabase();
 
-    await db.query("DELETE FROM foods_gallery WHERE id=?", [id]);
+    // Check if the record exists
+    const [rows] = await db.query("SELECT * FROM foods_gallery WHERE id = ?", [
+      id,
+    ]);
 
-    res.json({ message: "Image deleted" });
+    if (rows.length === 0) {
+      return res.status(404).json({ error: "Image not found" });
+    }
+
+    // Delete the record only from MySQL
+    await db.query("DELETE FROM foods_gallery WHERE id = ?", [id]);
+
+    res.json({ message: "Record deleted successfully" });
   } catch (err) {
     console.error("Delete error:", err);
-    res.status(500).json({ error: "Failed to delete image" });
+    res.status(500).json({ error: "Failed to delete record" });
   }
 });
 
