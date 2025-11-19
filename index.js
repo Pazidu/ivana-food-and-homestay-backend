@@ -5,7 +5,7 @@ import jwt from "jsonwebtoken";
 import session from "express-session";
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
-import admin from "./Firebase/admin.js"; // ✅ Use centralized Firebase init
+import admin from "./Firebase/admin.js";
 import bodyParser from "body-parser";
 
 import authRouter from "./routes/authRoutes.js";
@@ -100,9 +100,9 @@ app.use((req, res) => res.status(404).json({ error: "Route not found" }));
 (async () => {
   try {
     await connectToDatabase();
-    console.log("✅ MySQL pool created (server start check)");
+    console.log("MySQL pool created (server start check)");
   } catch (err) {
-    console.error("❌ Failed to create MySQL pool:", err.message);
+    console.error("Failed to create MySQL pool:", err.message);
   }
 })();
 

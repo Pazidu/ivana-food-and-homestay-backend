@@ -3,7 +3,7 @@ import { connectToDatabase } from "../lib/db.js";
 
 const router = express.Router();
 
-// Get menu items for users (only visible)
+// Get menu items for users
 router.get("/foods/menu", async (req, res) => {
   try {
     const db = await connectToDatabase();

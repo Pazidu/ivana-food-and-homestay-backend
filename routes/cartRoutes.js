@@ -2,23 +2,22 @@ import express from "express";
 import { connectToDatabase } from "../lib/db.js";
 import jwt from "jsonwebtoken";
 
-// 🔹 Middleware to authenticate JWT
+// Middleware to authenticate JWT
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers.authorization;
-  const token = authHeader && authHeader.split(" ")[1]; // Bearer <token>
-
+  const token = authHeader && authHeader.split(" ")[1];
   if (!token) return res.status(401).json({ error: "Unauthorized" });
 
   jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
     if (err) return res.status(403).json({ error: "Invalid token" });
-    req.user = user; // Attach user payload to request
+    req.user = user;
     next();
   });
 };
 
 const router = express.Router();
 
-// ✅ Get cart items for logged-in user
+// Get cart items for logged-in user
 router.get("/", authenticateToken, async (req, res) => {
   try {
     const db = await connectToDatabase();
@@ -36,7 +35,7 @@ router.get("/", authenticateToken, async (req, res) => {
   }
 });
 
-// ✅ Add to cart API (merge if same item already exists)
+//  Add to cart API (merge if same item already exists)
 router.post("/add", authenticateToken, async (req, res) => {
   try {
     const db = await connectToDatabase();
@@ -66,20 +65,17 @@ router.post("/add", authenticateToken, async (req, res) => {
           ? menuItem.regular_price
           : menuItem.large_price;
 
-      // 🔹 Check if this item already exists in user's cart
       const [existing] = await db.query(
         "SELECT id, quantity FROM cart WHERE user_id = ? AND item_id = ? AND description = ?",
         [userId, item.item_id, item.description]
       );
 
       if (existing.length > 0) {
-        // Update quantity if exists
         await db.query("UPDATE cart SET quantity = quantity + ? WHERE id = ?", [
           item.quantity,
           existing[0].id,
         ]);
       } else {
-        // Insert new row if not exists
         await db.query(
           "INSERT INTO cart (user_id, item_id, item_name, description, unit_price, quantity) VALUES (?, ?, ?, ?, ?, ?)",
           [
@@ -112,14 +108,13 @@ router.delete("/clear", authenticateToken, async (req, res) => {
   }
 });
 
-// ✅ Remove item from cart
+// Remove item from cart
 router.delete("/:id", authenticateToken, async (req, res) => {
   try {
     const db = await connectToDatabase();
     const userId = req.user.id;
     const cartItemId = req.params.id;
 
-    // Ensure only the logged-in user's item is deleted
     const [result] = await db.query(
       "DELETE FROM cart WHERE id = ? AND user_id = ?",
       [cartItemId, userId]
@@ -136,7 +131,7 @@ router.delete("/:id", authenticateToken, async (req, res) => {
   }
 });
 
-// ✅ Update item quantity
+// Update item quantity
 router.put("/:id", authenticateToken, async (req, res) => {
   try {
     const db = await connectToDatabase();
@@ -148,7 +143,6 @@ router.put("/:id", authenticateToken, async (req, res) => {
       return res.status(400).json({ error: "Quantity must be at least 1" });
     }
 
-    // Update only if the item belongs to logged-in user
     await db.query(
       "UPDATE cart SET quantity = ? WHERE id = ? AND user_id = ?",
       [quantity, cartItemId, userId]
@@ -163,7 +157,7 @@ router.put("/:id", authenticateToken, async (req, res) => {
       return res.status(404).json({ message: "Item not found in your cart" });
     }
 
-    res.json(rows[0]); // send updated item back
+    res.json(rows[0]); 
   } catch (err) {
     console.error("Error updating quantity:", err.message);
     res.status(500).json({ error: "Database error", details: err.message });

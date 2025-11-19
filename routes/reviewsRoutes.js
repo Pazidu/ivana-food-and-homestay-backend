@@ -4,8 +4,6 @@ import { connectToDatabase } from "../lib/db.js";
 
 const router = express.Router();
 
-/* ---------------- REVIEWS ROUTES ---------------- */
-
 // GET all reviews
 router.get("/foods/reviews", async (req, res) => {
   try {
@@ -84,7 +82,6 @@ router.delete("/foods/reviews/:id", async (req, res) => {
   }
 });
 
-/* ---------------- COMPLAINTS ROUTES ---------------- */
 
 // GET all complaints
 router.get("/foods/complaints", async (req, res) => {
@@ -157,7 +154,6 @@ router.delete("/foods/complaints/:id", async (req, res) => {
   }
 });
 
-/* ---------------- TEST ROUTE ---------------- */
 router.get("/test", (req, res) => {
   res.json({ message: "reviewsRoutes is working ✅" });
 });

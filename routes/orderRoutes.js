@@ -20,7 +20,7 @@ router.post("/", async (req, res) => {
     ]);
 
     res.status(201).json({
-      id: result.insertId, // ✅ return id instead of _id
+      id: result.insertId,
       userName,
       address,
       phone,

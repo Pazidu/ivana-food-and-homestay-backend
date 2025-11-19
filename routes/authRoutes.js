@@ -7,7 +7,7 @@ import nodemailer from "nodemailer";
 import passport from "passport";
 
 const router = express.Router();
-let otpStore = {}; // { email: { otp, expiresAt } }
+let otpStore = {}; 
 
 // ================== GOOGLE LOGIN ==================
 router.get(

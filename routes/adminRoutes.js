@@ -9,9 +9,6 @@ const router = express.Router();
 const upload = multer({ dest: "uploads/" });
 const bucket = admin.storage().bucket();
 
-// ================= Menu Routes =================
-
-// Get all menu items (Admin)
 router.get("/menu", async (req, res) => {
   try {
     const db = await connectToDatabase();
@@ -22,7 +19,6 @@ router.get("/menu", async (req, res) => {
   }
 });
 
-// Add a new menu item
 router.post("/menu", async (req, res) => {
   try {
     const db = await connectToDatabase();
@@ -48,7 +44,6 @@ router.post("/menu", async (req, res) => {
   }
 });
 
-// Upload image to Firebase
 router.post("/menu/upload-image", upload.single("image"), async (req, res) => {
   try {
     const localFilePath = req.file.path;
@@ -69,7 +64,6 @@ router.post("/menu/upload-image", upload.single("image"), async (req, res) => {
   }
 });
 
-// Edit menu item
 router.put("/menu/:id", async (req, res) => {
   try {
     const db = await connectToDatabase();
@@ -90,7 +84,6 @@ router.put("/menu/:id", async (req, res) => {
   }
 });
 
-// Delete menu item
 router.delete("/menu/:id", async (req, res) => {
   try {
     const db = await connectToDatabase();
@@ -102,7 +95,6 @@ router.delete("/menu/:id", async (req, res) => {
   }
 });
 
-// Hide/unhide menu item
 router.put("/menu/hide/:id", async (req, res) => {
   try {
     const db = await connectToDatabase();
@@ -117,9 +109,6 @@ router.put("/menu/hide/:id", async (req, res) => {
   }
 });
 
-// ================= Users Routes =================
-
-// Get all users
 router.get("/users", async (req, res) => {
   try {
     const db = await connectToDatabase();
@@ -130,7 +119,6 @@ router.get("/users", async (req, res) => {
   }
 });
 
-// Add new user
 router.post("/users", async (req, res) => {
   try {
     const db = await connectToDatabase();
@@ -153,7 +141,6 @@ router.post("/users", async (req, res) => {
   }
 });
 
-// Update only user_type
 router.put("/users/:id", async (req, res) => {
   try {
     const db = await connectToDatabase();
@@ -171,7 +158,6 @@ router.put("/users/:id", async (req, res) => {
   }
 });
 
-// Delete user
 router.delete("/users/:id", async (req, res) => {
   try {
     const db = await connectToDatabase();
@@ -183,9 +169,6 @@ router.delete("/users/:id", async (req, res) => {
   }
 });
 
-// ================= Bookings Routes =================
-
-// Get all bookings
 router.get("/bookings", async (req, res) => {
   try {
     const db = await connectToDatabase();
@@ -209,7 +192,6 @@ router.get("/bookings", async (req, res) => {
   }
 });
 
-// Delete booking
 router.delete("/bookings/:id", async (req, res) => {
   try {
     const db = await connectToDatabase();
@@ -221,9 +203,6 @@ router.delete("/bookings/:id", async (req, res) => {
   }
 });
 
-// ================= Gallery Routes =================
-
-// Add new gallery image (pending by default)
 router.post("/gallery/add", upload.single("image"), async (req, res) => {
   try {
     const { name, phone, type } = req.body; // type = "foods" or "homestay"
@@ -277,7 +256,6 @@ router.post("/gallery/add", upload.single("image"), async (req, res) => {
   }
 });
 
-// 🔹 Get pending images
 router.get("/gallery/pending", async (req, res) => {
   try {
     const db = await connectToDatabase();
@@ -301,7 +279,6 @@ router.get("/gallery/pending", async (req, res) => {
   }
 });
 
-// 🔹 Get approved images
 router.get("/gallery/approved", async (req, res) => {
   try {
     const db = await connectToDatabase();
@@ -325,7 +302,6 @@ router.get("/gallery/approved", async (req, res) => {
   }
 });
 
-// Approve an image
 router.put("/gallery/:id/approve", async (req, res) => {
   try {
     const db = await connectToDatabase();
@@ -339,7 +315,6 @@ router.put("/gallery/:id/approve", async (req, res) => {
   }
 });
 
-// Decline an image
 router.put("/gallery/:id/reject", async (req, res) => {
   try {
     const db = await connectToDatabase();
@@ -353,7 +328,6 @@ router.put("/gallery/:id/reject", async (req, res) => {
   }
 });
 
-// Delete image
 router.delete("/gallery/:id", async (req, res) => {
   try {
     const db = await connectToDatabase();

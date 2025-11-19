@@ -7,8 +7,6 @@ const router = express.Router();
 router.get("/", async (req, res) => {
   try {
     const pool = await connectToDatabase();
-
-    // Parse dates from query
     const { checkIn, checkOut } = req.query;
 
     const [rooms] = await pool.query("SELECT * FROM rooms");
