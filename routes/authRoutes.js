@@ -9,11 +9,10 @@ import passport from "passport";
 const router = express.Router();
 let otpStore = {}; 
 
-// ================== GOOGLE LOGIN ==================
-router.get(
-  "/google",
-  passport.authenticate("google", { scope: ["profile", "email"] })
-);
+// router.get(
+//   "/google",
+//   passport.authenticate("google", { scope: ["profile", "email"] })
+// );
 
 router.get(
   "/google/callback",

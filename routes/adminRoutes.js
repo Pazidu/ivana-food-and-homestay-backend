@@ -205,7 +205,7 @@ router.delete("/bookings/:id", async (req, res) => {
 
 router.post("/gallery/add", upload.single("image"), async (req, res) => {
   try {
-    const { name, phone, type } = req.body; // type = "foods" or "homestay"
+    const { name, phone, type } = req.body;
     const file = req.file;
     if (!file) return res.status(400).json({ error: "No file uploaded" });
 

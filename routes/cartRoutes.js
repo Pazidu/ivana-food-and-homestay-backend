@@ -2,7 +2,6 @@ import express from "express";
 import { connectToDatabase } from "../lib/db.js";
 import jwt from "jsonwebtoken";
 
-// Middleware to authenticate JWT
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers.authorization;
   const token = authHeader && authHeader.split(" ")[1];
@@ -17,7 +16,6 @@ const authenticateToken = (req, res, next) => {
 
 const router = express.Router();
 
-// Get cart items for logged-in user
 router.get("/", authenticateToken, async (req, res) => {
   try {
     const db = await connectToDatabase();
@@ -35,11 +33,10 @@ router.get("/", authenticateToken, async (req, res) => {
   }
 });
 
-//  Add to cart API (merge if same item already exists)
 router.post("/add", authenticateToken, async (req, res) => {
   try {
     const db = await connectToDatabase();
-    const items = req.body; // [{ item_id, description, quantity }, ...]
+    const items = req.body; 
     const userId = req.user.id;
 
     if (!Array.isArray(items) || items.length === 0) {
@@ -47,7 +44,6 @@ router.post("/add", authenticateToken, async (req, res) => {
     }
 
     for (const item of items) {
-      // Fetch item details from menu table
       const [rows] = await db.query(
         "SELECT name, regular_price, large_price FROM menu WHERE id = ?",
         [item.item_id]
@@ -97,7 +93,7 @@ router.post("/add", authenticateToken, async (req, res) => {
   }
 });
 
-// Clear all items in cart after payment
+
 router.delete("/clear", authenticateToken, async (req, res) => {
   try {
     const db = await connectToDatabase();
@@ -108,7 +104,7 @@ router.delete("/clear", authenticateToken, async (req, res) => {
   }
 });
 
-// Remove item from cart
+
 router.delete("/:id", authenticateToken, async (req, res) => {
   try {
     const db = await connectToDatabase();
@@ -131,7 +127,7 @@ router.delete("/:id", authenticateToken, async (req, res) => {
   }
 });
 
-// Update item quantity
+
 router.put("/:id", authenticateToken, async (req, res) => {
   try {
     const db = await connectToDatabase();
